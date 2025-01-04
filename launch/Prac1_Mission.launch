@@ -1,0 +1,28 @@
+ <launch>
+<node name="Stage" pkg="stage_ros" type="stageros" args="$(find project1)/worlds/mundo2.world"/>
+
+<node name="moveRobot" pkg="project1" type="moveRobot" output="screen">
+    <param name="ID_ROBOT" value="0" />
+    <param name="ALGOR" value="2" />
+    <param name="CRIT_DIST" value="1.0" />
+    <param name="D_OBJ" value="0.5" />
+    <param name="V_MAX_DES" value="0.8" />
+    <param name="V_MAX_ROT" value="1.0" />
+    <param name="K_ROT_MIN" value="0.1" />
+    <param name="K_ROT_MAX" value="0.25" />
+    <param name="ORI_ERROR" value="0.4" />
+    <param name="T_AVOID_OBS" value="2.0" />
+    <param name="DIST_LEADER" value="2.0" />
+    <param name="ROBOT_ROL" value="0" />
+    <param name="ID_LEADER" value="0" />
+    <param name="W_1" value="1.5" />
+    <param name="W_2" value="3.0" />
+    <param name="T_WAIT" value="150" />
+  </node>
+<node name="goalTalker" pkg="project1" type="goalTalker" output="screen">
+   <param name="X_Goal" value="-5" />
+   <param name="Y_Goal" value="2" />
+   <param name="T_Goal" value="7" />
+</node>
+
+</launch>
