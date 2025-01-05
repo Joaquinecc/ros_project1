@@ -60,7 +60,7 @@ double current_orientationr;
 geometry_msgs::Point globalGoal;
 bool isTheregoal = false;
 bool isThereobstacle = false;
-
+bool avoidObstacle = false;
 
 double calculateOrientationDifference(double goal_x, double goal_y) {
 /**
@@ -96,43 +96,50 @@ double calculateOrientationDifference(double goal_x, double goal_y) {
 */
 
 geometry_msgs::Twist algo1(const sensor_msgs::LaserScan& most_intense) {
-		//Set all to 0
-		geometry_msgs::Twist cmd_vel;
-		cmd_vel.linear.x = 0.0;
-		cmd_vel.linear.y = 0.0;
-		cmd_vel.linear.z = 0.0;
-		cmd_vel.angular.x = 0.0;
-		cmd_vel.angular.y = 0.0;
-		cmd_vel.angular.z = 0.0;
-		
-		if (!isThereobstacle){ //There is no obstable to avoid
-			double diff_angle =  calculateOrientationDifference(globalGoal.x, globalGoal.y);
-			// Proportional Controller for rotation
-			double rot_vel = 0.0;
-			if (fabs(diff_angle) < ORI_ERROR) {
-				rot_vel = K_ROT_MIN * V_MAX_ROT * diff_angle;
-				cmd_vel.linear.x = V_MAX_DES;
-			} else {
-				rot_vel = K_ROT_MAX * V_MAX_ROT * diff_angle;
-			}
-			cmd_vel.angular.z = rot_vel;
-		}else{// Avoid obstacle
-			cmd_vel.linear.x = V_MAX_DES;
-		}
-			
+    //Set all to 0
+    geometry_msgs::Twist cmd_vel;
+    cmd_vel.linear.x = 0.0;
+    cmd_vel.linear.y = 0.0;
+    cmd_vel.linear.z = 0.0;
+    cmd_vel.angular.x = 0.0;
+    cmd_vel.angular.y = 0.0;
+    cmd_vel.angular.z = 0.0;
 
-		//AVOID OBSTACLES
-		int length = most_intense.ranges.size(); 		
-		for(int i=0; i<length; i++){
-			if(most_intense.ranges[i] < CRIT_DIST) {
-				isThereobstacle= true;
-				cmd_vel.linear.x = 0.0;
-				cmd_vel.angular.z = 1.0;
-				break;
-			}else{
-				isThereobstacle = false;
-			}
-		}
+    // Detect obstacles
+    bool obstacle_detected = false; // Local flag to detect obstacles
+    int length = most_intense.ranges.size(); 		
+    for(int i=0; i<length; i++){
+        if(most_intense.ranges[i] < CRIT_DIST) {
+            obstacle_detected= true;
+            cmd_vel.angular.z = 1.0;
+            break;}
+    }
+    if (obstacle_detected) {
+        // Set obstacle flags and rotate in place
+        isThereobstacle = true;
+        cmd_vel.angular.z = 1.0; // Rotate to avoid obstacle
+    }else{// No obstacle detected
+        if (isThereobstacle) {
+            // Transition from obstacle state to avoid obstacle
+            avoidObstacle = true;
+            isThereobstacle = false; // Reset obstacle flag
+        }
+        if (avoidObstacle) {
+            // Move forward after avoiding obstacle
+            cmd_vel.linear.x = V_MAX_DES;
+        } else {
+            // Normal operation: move toward goal
+            double diff_angle =  calculateOrientationDifference(globalGoal.x, globalGoal.y);
+            // Proportional Controller for rotation
+            double rot_vel = 0.0;
+            if (fabs(diff_angle) < ORI_ERROR) {
+                rot_vel = K_ROT_MIN * V_MAX_ROT * diff_angle;
+                cmd_vel.linear.x = V_MAX_DES;
+            } else {
+                rot_vel = K_ROT_MAX * V_MAX_ROT * diff_angle;
+            }
+            cmd_vel.angular.z = rot_vel;
+        }
 
 		return cmd_vel;
 }
@@ -207,25 +214,40 @@ geometry_msgs::Twist algo2(const sensor_msgs::LaserScan& most_intense) {
     return cmd_vel;
 }
 void callbackLaser(const sensor_msgs::LaserScan& most_intense) {
-	static ros::Time last_decision_time = ros::Time::now(); // Track last decision time
-
+    static ros::Time last_decision_time = ros::Time::now(); // Track last decision time
+    geometry_msgs::Twist cmd_vel; // Initialize cmd_vel
     if (isTheregoal) { // If there is a goal, we move toward it
-        if (ALGOR == 1) {
-            geometry_msgs::Twist cmd_vel = algo1(most_intense);
-            cmd_vel_pub.publish(cmd_vel);
-            ros::spinOnce();
-        }
-		else{
-			// Check if enough time has passed for algo2 decisions
-            ros::Time current_time = ros::Time::now();
-            if ((current_time - last_decision_time).toSec() * 1000 >= T_WAIT) {
-                // Execute algo2 for potential fields algorithm
-                geometry_msgs::Twist cmd_vel = algo2(most_intense);
-                cmd_vel_pub.publish(cmd_vel);
-                ros::spinOnce();
+        ros::Time current_time = ros::Time::now();
 
+        if (ALGOR == 1) {
+            if(avoidObstacle){ // If flag is active, wait for T_AVOID_OBS
+                if ((current_time - last_decision_time).toSec() * 1000 >= T_AVOID_OBS) {
+                    cmd_vel = algo1(most_intense);
+                    avoidObstacle=false;
+                    // Update the last decision time
+                    last_decision_time = current_time;
+                    //Update velocities
+                    cmd_vel_pub.publish(cmd_vel);
+                    ros::spinOnce();
+                }
+            }else{
+                cmd_vel = algo1(most_intense);
                 // Update the last decision time
                 last_decision_time = current_time;
+                //Update velocities
+                cmd_vel_pub.publish(cmd_vel);
+                ros::spinOnce();
+            }
+        }else if (ALGOR == 2) { // Potential fields algorithm
+			// Check if enough time has passed for algo2 decisions
+            if ((current_time - last_decision_time).toSec() * 1000 >= T_WAIT) {
+                // Execute algo2 for potential fields algorithm
+                cmd_vel = algo2(most_intense);
+                // Update the last decision time
+                last_decision_time = current_time;
+                //Update velocities
+                cmd_vel_pub.publish(cmd_vel);
+                ros::spinOnce();
             }
 		}
     }
