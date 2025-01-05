@@ -58,6 +58,7 @@ double current_orientationr;
 
 
 geometry_msgs::Point globalGoal;
+//States Flag
 bool isTheregoal = false;
 bool isThereobstacle = false;
 bool avoidObstacle = false;
@@ -140,8 +141,8 @@ geometry_msgs::Twist algo1(const sensor_msgs::LaserScan& most_intense) {
             }
             cmd_vel.angular.z = rot_vel;
         }
-
-		return cmd_vel;
+    }
+    return cmd_vel;
 }
 
 
