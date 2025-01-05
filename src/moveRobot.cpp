@@ -62,6 +62,7 @@ geometry_msgs::Point globalGoal;
 bool isTheregoal = false;
 bool isThereobstacle = false;
 bool avoidObstacle = false;
+bool DEBUG=true;
 
 double calculateOrientationDifference(double goal_x, double goal_y) {
 /**
@@ -116,11 +117,17 @@ geometry_msgs::Twist algo1(const sensor_msgs::LaserScan& most_intense) {
             break;}
     }
     if (obstacle_detected) {
+        if(DEBUG && !isThereobstacle){// Only the first ime
+            ROS_INFO("obstacle_detected");
+        }
         // Set obstacle flags and rotate in place
         isThereobstacle = true;
         cmd_vel.angular.z = 1.0; // Rotate to avoid obstacle
     }else{// No obstacle detected
         if (isThereobstacle) {
+            if(DEBUG){
+    			ROS_INFO("Avoid Obstacle State");
+            }
             // Transition from obstacle state to avoid obstacle
             avoidObstacle = true;
             isThereobstacle = false; // Reset obstacle flag
@@ -225,6 +232,9 @@ void callbackLaser(const sensor_msgs::LaserScan& most_intense) {
                 if ((current_time - last_decision_time).toSec() * 1000 >= T_AVOID_OBS) {
                     cmd_vel = algo1(most_intense);
                     avoidObstacle=false;
+                    if(DEBUG){
+                        ROS_INFO("Normal State");
+                    }
                     // Update the last decision time
                     last_decision_time = current_time;
                     //Update velocities
