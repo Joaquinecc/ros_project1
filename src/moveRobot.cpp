@@ -229,7 +229,7 @@ void callbackLaser(const sensor_msgs::LaserScan& most_intense) {
 
         if (ALGOR == 1) {
             if(avoidObstacle){ // If flag is active, wait for T_AVOID_OBS
-                if ((current_time - last_decision_time).toSec() * 1000 >= T_AVOID_OBS) {
+                if ((current_time - last_decision_time).toSec() >= T_AVOID_OBS) {
                     cmd_vel = algo1(most_intense);
                     avoidObstacle=false;
                     if(DEBUG){
