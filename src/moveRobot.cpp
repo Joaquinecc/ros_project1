@@ -239,7 +239,6 @@ void callbackLaser(const sensor_msgs::LaserScan& most_intense) {
                     last_decision_time = current_time;
                     //Update velocities
                     cmd_vel_pub.publish(cmd_vel);
-                    ros::spinOnce();
                 }
             }else{
                 cmd_vel = algo1(most_intense);
@@ -247,7 +246,6 @@ void callbackLaser(const sensor_msgs::LaserScan& most_intense) {
                 last_decision_time = current_time;
                 //Update velocities
                 cmd_vel_pub.publish(cmd_vel);
-                ros::spinOnce();
             }
         }else if (ALGOR == 2) { // Potential fields algorithm
 			// Check if enough time has passed for algo2 decisions
@@ -258,9 +256,10 @@ void callbackLaser(const sensor_msgs::LaserScan& most_intense) {
                 last_decision_time = current_time;
                 //Update velocities
                 cmd_vel_pub.publish(cmd_vel);
-                ros::spinOnce();
             }
 		}
+        ros::spinOnce();
+
     }
 }
 
