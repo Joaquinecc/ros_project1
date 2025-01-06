@@ -154,14 +154,14 @@ geometry_msgs::Twist algo1(const sensor_msgs::LaserScan& most_intense) {
 
 
 geometry_msgs::Twist algo2(const sensor_msgs::LaserScan& most_intense) {
-		//Set all to 0
-		geometry_msgs::Twist cmd_vel;
-		cmd_vel.linear.x = 0.0;
-		cmd_vel.linear.y = 0.0;
-		cmd_vel.linear.z = 0.0;
-		cmd_vel.angular.x = 0.0;
-		cmd_vel.angular.y = 0.0;
-		cmd_vel.angular.z = 0.0;
+    // Set all velocities to 0
+    geometry_msgs::Twist cmd_vel;
+    cmd_vel.linear.x = 0.0;
+    cmd_vel.linear.y = 0.0;
+    cmd_vel.linear.z = 0.0;
+    cmd_vel.angular.x = 0.0;
+    cmd_vel.angular.y = 0.0;
+    cmd_vel.angular.z = 0.0;
 
 	// Calculate Vobj (Go to Goal Behavior)
 	double VobjX = globalGoal.x - current_Xr;
@@ -183,12 +183,31 @@ geometry_msgs::Twist algo2(const sensor_msgs::LaserScan& most_intense) {
             continue;
         }
 
-        // Calculate repulsion magnitude
-        double magnitude = (di < CRIT_DIST) ? (CRIT_DIST-di) / CRIT_DIST : 0.0;
+        // Calculate obstacle local coordinates
+        double obsX_local = di * cos(angle);
+        double obsY_local = di * sin(angle);
 
-        // Add to Vobs
-        VobsX += magnitude * std::cos(angle);
-        VobsY += magnitude * std::sin(angle);
+        // Transform to global coordinates
+        double obsX_global = obsX_local * cos(current_orientationr) - obsY_local * sin(current_orientationr) + current_Xr;
+        double obsY_global = obsX_local * sin(current_orientationr) + obsY_local * cos(current_orientationr) + current_Yr;
+
+        
+        // Compute repulsion vector (global frame)
+        double repX = current_Xr - obsX_global;
+        double repY = current_Yr - obsY_global;
+
+        // Compute magnitude of repulsion
+        double normRep = std::sqrt(repX * repX + repY * repY);
+        if (normRep > 0.0) { // Avoid division by zero
+            repX /= normRep;
+            repY /= normRep;
+
+            // Scale repulsion by distance (if within CRIT_DIST)
+            double magnitude = (di < CRIT_DIST) ? (CRIT_DIST - di) / CRIT_DIST : 0.0;
+            VobsX += magnitude * repX;
+            VobsY += magnitude * repY;
+        }
+        
     }
 
 	// Calculate resulting vector Vf
