@@ -211,15 +211,16 @@ geometry_msgs::Twist algo2(const sensor_msgs::LaserScan& most_intense) {
     }
 
 	// Calculate resulting vector Vf
-    double VfX = W_1 * VobjX - W_2 * VobsX;
-    double VfY = W_1 * VobjY - W_2 * VobsY;
+    double VfX = W_1 * VobjX + W_2 * VobsX;
+    double VfY = W_1 * VobjY + W_2 * VobsY;
 
     // Calculate desired orientation
     double desired_angle = std::atan2(VfY, VfX);
 
     // Set cmd_vel
-    double normVf = std::sqrt(VfX * VfX + VfY * VfY);
-    cmd_vel.linear.x = std::min(V_MAX_DES, normVf);
+    // double normVf = std::sqrt(VfX * VfX + VfY * VfY);
+    // cmd_vel.linear.x = std::min(V_MAX_DES, normVf);
+    cmd_vel.linear.x = V_MAX_DES;
 
     // Calculate difference in orientation
     double diff_angle = desired_angle - current_orientationr;
