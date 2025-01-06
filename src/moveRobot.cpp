@@ -230,16 +230,15 @@ void callbackLaser(const sensor_msgs::LaserScan& most_intense) {
         if (ALGOR == 1) {
             if(avoidObstacle){ // If flag is active, wait for T_AVOID_OBS
                 if ((current_time - last_decision_time).toSec() >= T_AVOID_OBS) {
-                    cmd_vel = algo1(most_intense);
                     avoidObstacle=false;
+                    // Update the last decision time
+                    last_decision_time = current_time;
                     if(DEBUG){
                         ROS_INFO("Normal State");
                     }
-                    // Update the last decision time
-                    last_decision_time = current_time;
-                    //Update velocities
-                    cmd_vel_pub.publish(cmd_vel);
                 }
+                cmd_vel = algo1(most_intense);
+                cmd_vel_pub.publish(cmd_vel);
             }else{
                 cmd_vel = algo1(most_intense);
                 // Update the last decision time
