@@ -234,4 +234,3 @@ target_link_libraries(goalTalker ${catkin_LIBRARIES})
 
 add_executable(moveRobot src/moveRobot.cpp)
 target_link_libraries(moveRobot ${catkin_LIBRARIES})
-

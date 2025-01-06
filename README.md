@@ -28,25 +28,25 @@ Ensure the following are installed:
 
 ### 0. Creating a New Package
 
-1. **Change to the Catkin Workspace Directory**  
+1. **Change to the Catkin Workspace Directory**
    ```bash
    cd ~/catkin_ws/src
-1. **Create a New Package**  
+1. **Create a New Package**
    ```bash
    catkin_create_pkg project1 std_msgs roscpp tf geometry_msgs genmsg nav_msgs
-1. **Pull the Project Repository**  
+1. **Pull the Project Repository**
    ```bash
     cd ~/catkin_ws/src/project1
     git clone https://github.com/Joaquinecc/ros_project1.git .
-1. **Compile the Workspace**  
+1. **Compile the Workspace**
    ```bash
    cd ~/catkin_ws/src
    catkin_make
-1. **Initialize the Environment**  
+1. **Initialize the Environment**
    ```bash
    source devel/setup.bash
 1. **Run the Launch File**
-    Ensure roscore is running, then launch the file:  
+    Ensure roscore is running, then launch the file:
    ```bash
     roslaunch project1 Prac1_Mission.launch
 

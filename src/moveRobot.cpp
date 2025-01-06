@@ -67,10 +67,10 @@ bool DEBUG=true;
 double calculateOrientationDifference(double goal_x, double goal_y) {
 /**
  * @brief Calculate the difference between the current orientation and the goal orientation.
- * 
+ *
  * Given the goal point (goal.x, goal.y) and the current robot position (current_Xr, current_Yr),
  * this function calculates the orientation difference in radians.
- * 
+ *
  * @param goal_x X-coordinate of the goal point.
  * @param goal_y Y-coordinate of the goal point.
  * @return double The orientation difference in radians.
@@ -94,7 +94,7 @@ double calculateOrientationDifference(double goal_x, double goal_y) {
 
 /**
   Read the the Laser data. If there is an obstacle close r the robot, stop and turn
-  otherwise move ahead. 
+  otherwise move ahead.
 */
 
 geometry_msgs::Twist algo1(const sensor_msgs::LaserScan& most_intense) {
@@ -109,7 +109,7 @@ geometry_msgs::Twist algo1(const sensor_msgs::LaserScan& most_intense) {
 
     // Detect obstacles
     bool obstacle_detected = false; // Local flag to detect obstacles
-    int length = most_intense.ranges.size(); 		
+    int length = most_intense.ranges.size();
     for(int i=0; i<length; i++){
         if(most_intense.ranges[i] < CRIT_DIST) {
             obstacle_detected= true;
@@ -191,7 +191,7 @@ geometry_msgs::Twist algo2(const sensor_msgs::LaserScan& most_intense) {
         double obsX_global = obsX_local * cos(current_orientationr) - obsY_local * sin(current_orientationr) + current_Xr;
         double obsY_global = obsX_local * sin(current_orientationr) + obsY_local * cos(current_orientationr) + current_Yr;
 
-        
+
         // Compute repulsion vector (global frame)
         double repX = current_Xr - obsX_global;
         double repY = current_Yr - obsY_global;
@@ -207,7 +207,7 @@ geometry_msgs::Twist algo2(const sensor_msgs::LaserScan& most_intense) {
             VobsX += magnitude * repX;
             VobsY += magnitude * repY;
         }
-        
+
     }
 
 	// Calculate resulting vector Vf
@@ -386,7 +386,3 @@ int main(int argc, char **argv) {
 	start = ros::Time::now();
 	ros::spin();
 }
-
-
-
-

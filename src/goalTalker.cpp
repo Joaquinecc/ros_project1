@@ -26,7 +26,7 @@
 * This code will publish a integers from 0 to n with a delay of 100ms
  */
 
-//roscpp Core header 
+//roscpp Core header
 #include "ros/ros.h"
 //Header of Int32 standard message
 #include "std_msgs/Int32.h"
@@ -44,7 +44,7 @@ int main(int argc, char **argv)
 	ros::init(argc, argv,"goaltalker");
 	ros::NodeHandle node_obj; //= ros::NodeHandle("sdf");
 	ros::Publisher number_publisher = node_obj.advertise<geometry_msgs::Point>("myGoals", 10);
-	
+
 	ros::NodeHandle nh_private("~");
 	nh_private.param<double>("T_Goal", t_goal, 1.0);
 	ros::Rate loop_rate(1/t_goal);
@@ -60,8 +60,7 @@ int main(int argc, char **argv)
 		number_publisher.publish(msg);
 		ros::spinOnce();
 		loop_rate.sleep();
-		
+
 	}
 	return 0;
 }
-
