@@ -84,3 +84,38 @@ Ensure the following are installed:
    - Located in the `launch/` directory.
    - Launches the `moveRobot` and `talkerGoals` nodes.
    - Uses the world file `mundo.world` located in the `worlds/` directory.
+
+
+## 1.3 Submitting Code
+
+### 1.3.1 Pre-commit
+
+This code base uses pre-commit git-hooks in order to check the code before it is committed to the repo. After
+you have cloned the repo, install pre-commit package:
+
+```shell
+pip install pre-commit
+```
+
+and then install the pre-commit checks:
+
+```shell
+pre-commit install
+```
+
+Pre-commit needs to be installed only once after cloning the repo. Pre-commit is run automatically every time you commit code,
+but you can run it manually as follows:
+
+```shell
+pre-commit run --all-files
+```
+
+When you run the above command, you will get a list of things that need to be fixed before committing.
+
+### 1.3.2 Branching
+
+Always create a new branch for anything that you want to merge to the main-branch, and then create a pull request (PR)
+in GitHub when you are ready to submit the code. Before submitting the code, please make sure that it's PEP8 compliant.
+
+All the code needs to be commented before submitting it, so that the input parameters and return values of functions are
+clearly commented. Happy coding!!
