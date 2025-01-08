@@ -196,7 +196,7 @@ geometry_msgs::Twist algo2(const sensor_msgs::LaserScan& most_intense) {
         double di = most_intense.ranges[i];
 
         // Skip invalid readings
-        if (di < 0.01 || di > most_intense.range_max) {
+        if (di <most_intense.range_min || di > most_intense.range_max) {
             continue;
         }
 
