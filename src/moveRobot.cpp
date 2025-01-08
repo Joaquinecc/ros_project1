@@ -252,7 +252,7 @@ geometry_msgs::Twist algo2(const sensor_msgs::LaserScan& most_intense) {
         rot_vel = K_ROT_MIN * V_MAX_ROT * diff_angle;
     } else {
         rot_vel = K_ROT_MAX * V_MAX_ROT * diff_angle;
-		cmd_vel.linear.x=0;
+		cmd_vel.linear.x=V_MAX_DES*0.3;
     }
     cmd_vel.angular.z = rot_vel;
 
