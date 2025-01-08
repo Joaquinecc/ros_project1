@@ -54,34 +54,19 @@ int T_WAIT = 150;               // Time to wait between algorithm decisions (ms)
 ros::Publisher cmd_vel_pub;      // Publisher for movement commands
 ros::Time start;
 
-double current_Xr;               // Current robot X position
-double current_Yr;               // Current robot Y position
-double current_z;                // Orientation quaternion Z component
-double current_w;                // Orientation quaternion W component
+geometry_msgs::Point goal_coord; // Global goal position
+geometry_msgs::Point leader_coords; // Global goal position
 double current_orientationr;     // Current orientation in radians
 
-geometry_msgs::Point globalGoal; // Global goal position
-
 // State Flags
-bool isTheregoal = false;        // Indicates if a goal is set
-bool isThereobstacle = false;    // Indicates if an obstacle is detected
-bool avoidObstacle = false;      // Indicates if the robot is avoiding an obstacle
 bool DEBUG = true;               // Debug mode flag
+bool isTheregoal=false;
 
-/**
- * @brief Calculate the difference between the current orientation and the goal orientation.
- *
- * Given the goal point (goal_x, goal_y) and the current robot position (current_Xr, current_Yr),
- * this function calculates the orientation difference in radians.
- *
- * @param goal_x X-coordinate of the goal point.
- * @param goal_y Y-coordinate of the goal point.
- * @return double The orientation difference in radians.
- */
-double calculateOrientationDifference(double goal_x, double goal_y) {
+
+double calculateOrientationDifference(const geometry_msgs::Point goal,geometry_msgs::Point robot_coords ) {
 
     // Calculate the desired angle to the goal point
-    double desired_orientation = atan2(goal_y - current_Yr, goal_x - current_Xr);
+    double desired_orientation = atan2(goal.y - robot_coords.y, goal.x - robot_coords.x);
 
     // Calculate the difference in orientation
     double orientation_difference = desired_orientation - current_orientationr;
@@ -97,16 +82,12 @@ double calculateOrientationDifference(double goal_x, double goal_y) {
     return orientation_difference;
 }
 
-/**
- * @brief Obstacle avoidance algorithm (Algo 1).
- *
- * Reads laser scan data and decides robot motion based on obstacle proximity.
- * Rotates in place if an obstacle is detected; otherwise, moves toward the goal.
- *
- * @param most_intense Laser scan data.
- * @return geometry_msgs::Twist Command velocities for the robot.
- */
 geometry_msgs::Twist algo1(const sensor_msgs::LaserScan& most_intense) {
+
+    static bool avoid_obstacle = false; // Local flag to detect obstacles
+    static ros::Time last_decision_time = ros::Time::now(); // Track last decision time
+
+
     //Set all to 0
     geometry_msgs::Twist cmd_vel;
     cmd_vel.linear.x = 0.0;
@@ -116,60 +97,55 @@ geometry_msgs::Twist algo1(const sensor_msgs::LaserScan& most_intense) {
     cmd_vel.angular.y = 0.0;
     cmd_vel.angular.z = 0.0;
 
-    // Detect obstacles
-    bool obstacle_detected = false; // Local flag to detect obstacles
+    // Rotate until it find a free obstacle path
     int length = most_intense.ranges.size();
     for(int i=0; i<length; i++){
         if(most_intense.ranges[i] < CRIT_DIST) {
-            obstacle_detected= true;
-            cmd_vel.angular.z = 1.0;
-            break;}
-    }
-    if (obstacle_detected) {
-        if(DEBUG && !isThereobstacle){// Only the first ime
-            ROS_INFO("obstacle_detected");
-        }
-        // Set obstacle flags and rotate in place
-        isThereobstacle = true;
-        cmd_vel.angular.z = 1.0; // Rotate to avoid obstacle
-    }else{// No obstacle detected
-        if (isThereobstacle) {
             if(DEBUG){
-    			ROS_INFO("Avoid Obstacle State");
+                ROS_INFO("OBSTACLES DETECTED");
             }
-            // Transition from obstacle state to avoid obstacle
-            avoidObstacle = true;
-            isThereobstacle = false; // Reset obstacle flag
-        }
-        if (avoidObstacle) {
-            // Move forward after avoiding obstacle
-            cmd_vel.linear.x = V_MAX_DES;
-        } else {
-            // Normal operation: move toward goal
-            double diff_angle =  calculateOrientationDifference(globalGoal.x, globalGoal.y);
-            // Proportional Controller for rotation
-            double rot_vel = 0.0;
-            if (fabs(diff_angle) < ORI_ERROR) {
-                rot_vel = K_ROT_MIN * V_MAX_ROT * diff_angle;
-                cmd_vel.linear.x = V_MAX_DES;
-            } else {
-                rot_vel = K_ROT_MAX * V_MAX_ROT * diff_angle;
-            }
-            cmd_vel.angular.z = rot_vel;
+            avoid_obstacle= true;
+            cmd_vel.angular.z = 1.0;
+            last_decision_time = ros::Time::now();
+            return cmd_vel;
         }
     }
+
+    if(avoid_obstacle){ //Avoid obstacle for T_AVOID_OBS
+        ros::Time current_time = ros::Time::now();
+
+        if(DEBUG){
+            ROS_INFO("AVOID OBSTACLES: Time elapsed = %f seconds", (current_time - last_decision_time).toSec());
+        }
+        if ((current_time - last_decision_time).toSec() >= T_AVOID_OBS) {
+            avoid_obstacle=false;
+            if(DEBUG){
+                ROS_INFO("AVOID OBSTACLES DEACTIVATED");
+            }
+        }
+        last_decision_time=current_time;
+        cmd_vel.linear.x = V_MAX_DES;
+        return cmd_vel;
+    }
+    if(DEBUG){
+        ROS_INFO("NORMAL OPERATIONS");
+    }
+
+    // Normal operation: move toward goal
+    double diff_angle =  calculateOrientationDifference(goal_coord,leader_coords);
+    // Proportional Controller for rotation
+    double rot_vel = 0.0;
+    if (fabs(diff_angle) < ORI_ERROR) {
+        rot_vel = K_ROT_MIN * V_MAX_ROT * diff_angle;
+        cmd_vel.linear.x = V_MAX_DES;
+    } else {
+        rot_vel = K_ROT_MAX * V_MAX_ROT * diff_angle;
+    }
+    cmd_vel.angular.z = rot_vel;
     return cmd_vel;
+
 }
 
-/**
- * @brief Potential field algorithm (Algo 2).
- *
- * Combines attractive force toward the goal and repulsive force from obstacles.
- * Determines the robot’s velocity based on the resulting vector.
- *
- * @param most_intense Laser scan data.
- * @return geometry_msgs::Twist Command velocities for the robot.
- */
 geometry_msgs::Twist algo2(const sensor_msgs::LaserScan& most_intense) {
     // Set all velocities to 0
     geometry_msgs::Twist cmd_vel;
@@ -181,8 +157,8 @@ geometry_msgs::Twist algo2(const sensor_msgs::LaserScan& most_intense) {
     cmd_vel.angular.z = 0.0;
 
 	// Calculate Vobj (Go to Goal Behavior)
-	double VobjX = globalGoal.x - current_Xr;
-	double VobjY = globalGoal.y - current_Yr;
+	double VobjX = goal_coord.x - leader_coords.x;
+	double VobjY = goal_coord.y - leader_coords.y;
 	double normVobj = std::sqrt(VobjX * VobjX + VobjY * VobjY);
 	VobjX /= normVobj; // Normalize to unit vector
     VobjY /= normVobj;
@@ -205,13 +181,13 @@ geometry_msgs::Twist algo2(const sensor_msgs::LaserScan& most_intense) {
         double obsY_local = di * sin(angle);
 
         // Transform to global coordinates
-        double obsX_global = obsX_local * cos(current_orientationr) - obsY_local * sin(current_orientationr) + current_Xr;
-        double obsY_global = obsX_local * sin(current_orientationr) + obsY_local * cos(current_orientationr) + current_Yr;
+        double obsX_global = obsX_local * cos(current_orientationr) - obsY_local * sin(current_orientationr) + leader_coords.x;
+        double obsY_global = obsX_local * sin(current_orientationr) + obsY_local * cos(current_orientationr) + leader_coords.y;
 
 
         // Compute repulsion vector (global frame)
-        double repX = current_Xr - obsX_global;
-        double repY = current_Yr - obsY_global;
+        double repX = leader_coords.x - obsX_global;
+        double repY = leader_coords.y - obsY_global;
 
         // Compute magnitude of repulsion
         double normRep = std::sqrt(repX * repX + repY * repY);
@@ -258,39 +234,17 @@ geometry_msgs::Twist algo2(const sensor_msgs::LaserScan& most_intense) {
 
     return cmd_vel;
 }
-/**
- * @brief Laser scan callback function.
- *
- * Determines robot behavior based on laser scan data, selecting between obstacle avoidance and goal pursuit.
- *
- * @param most_intense Laser scan data.
- */
-void callbackLaser(const sensor_msgs::LaserScan& most_intense) {
+
+void callbackLaserLeader(const sensor_msgs::LaserScan& most_intense) {
     static ros::Time last_decision_time = ros::Time::now(); // Track last decision time
     geometry_msgs::Twist cmd_vel; // Initialize cmd_vel
     if (isTheregoal) { // If there is a goal, we move toward it
-        ros::Time current_time = ros::Time::now();
 
         if (ALGOR == 1) {
-            if(avoidObstacle){ // If flag is active, wait for T_AVOID_OBS
-                if ((current_time - last_decision_time).toSec() >= T_AVOID_OBS) {
-                    avoidObstacle=false;
-                    // Update the last decision time
-                    last_decision_time = current_time;
-                    if(DEBUG){
-                        ROS_INFO("Normal State");
-                    }
-                }
                 cmd_vel = algo1(most_intense);
                 cmd_vel_pub.publish(cmd_vel);
-            }else{
-                cmd_vel = algo1(most_intense);
-                // Update the last decision time
-                last_decision_time = current_time;
-                //Update velocities
-                cmd_vel_pub.publish(cmd_vel);
-            }
         }else if (ALGOR == 2) { // Potential fields algorithm
+             ros::Time current_time = ros::Time::now();
 			// Check if enough time has passed for algo2 decisions
             if ((current_time - last_decision_time).toSec() * 1000 >= T_WAIT) {
                 // Execute algo2 for potential fields algorithm
@@ -307,30 +261,15 @@ void callbackLaser(const sensor_msgs::LaserScan& most_intense) {
 }
 
 
-/**
- * @brief Odometry callback function.
- *
- * Updates the robot's current position and checks goal proximity.
- *
- * @param odom Odometry data.
- */
-void callbackOdom(const nav_msgs::Odometry odom) {
-/*
- The extracted values are:
- * - current_Xr: X-coordinate of the robot's current position.
- * - current_Yr: Y-coordinate of the robot's current position.
- * - current_z: Z-component of the robot's orientation quaternion.
- * - current_w: W-component of the robot's orientation quaternion.
- * - current_orientationr: The robot's orientation angle in radians.
- */
-	current_Xr = odom.pose.pose.position.x;
-	current_Yr = odom.pose.pose.position.y;
-	current_z=odom.pose.pose.orientation.z;
-	current_w=odom.pose.pose.orientation.w;
+void callbackOdomLeader(const nav_msgs::Odometry odom) {
+	leader_coords.x = odom.pose.pose.position.x;
+	leader_coords.y = odom.pose.pose.position.y;
+	double current_z=odom.pose.pose.orientation.z;
+	double current_w=odom.pose.pose.orientation.w;
 	current_orientationr=(2.0*atan2(current_z,current_w));
 
 	if (isTheregoal) {
-		double distance_to_goal = sqrt(pow(globalGoal.x - current_Xr, 2) + pow(globalGoal.y - current_Yr, 2));
+		double distance_to_goal = sqrt(pow(goal_coord.x - leader_coords.x, 2) + pow(goal_coord.y - leader_coords.y, 2));
 		if (distance_to_goal < D_OBJ) {
 			isTheregoal = false;
 			ROS_INFO("Goal point achieved.");
@@ -346,8 +285,8 @@ void callbackOdom(const nav_msgs::Odometry odom) {
  * @param goal Goal position data.
  */
 void callbackmyGoal(const geometry_msgs::Point goal) {
-	globalGoal.x=goal.x;
-	globalGoal.y=goal.y;
+	goal_coord.x=goal.x;
+	goal_coord.y=goal.y;
 	isTheregoal = true;
 
 }
@@ -414,10 +353,10 @@ int main(int argc, char **argv) {
     cmd_vel_pub = nh.advertise<geometry_msgs::Twist>(robot_ns + "/cmd_vel", 10);
 
     // Subscriber for robot's odometry
-    ros::Subscriber odom_sub = nh.subscribe(robot_ns + "/odom", 10, callbackOdom);
+    ros::Subscriber odom_sub = nh.subscribe(robot_ns + "/odom", 10, callbackOdomLeader);
 
     // Subscriber for robot's laser scan
-    ros::Subscriber laser_sub = nh.subscribe(robot_ns + "/base_scan_1", 1, callbackLaser);
+    ros::Subscriber laser_sub = nh.subscribe(robot_ns + "/base_scan_1", 1, callbackLaserLeader);
 
 	start = ros::Time::now();
 	ros::spin();
