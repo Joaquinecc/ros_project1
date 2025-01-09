@@ -344,8 +344,9 @@ int main(int argc, char **argv) {
     // Dynamically construct topic names using ID_ROBOT
     std::stringstream ss;
     ss << "robot_" << (ROBOT_ROL == 0 ? ID_ROBOT : ID_LEADER);
-    ROS_INFO("robot_leader: %s", robot_leader.c_str());
     std::string robot_leader = ss.str(); // Example: "robot_1" for ID_ROBOT=1
+    ROS_INFO("robot_leader: %s", robot_leader.c_str());
+
     // Get the goal objective of the robot
     ros::Subscriber goal_sub = nh.subscribe("myGoals", 10, callbackmyGoal);
     // Publisher for robot velocity
