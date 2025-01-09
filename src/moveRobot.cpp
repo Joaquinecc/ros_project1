@@ -211,8 +211,6 @@ geometry_msgs::Twist algo2(const sensor_msgs::LaserScan& most_intense,const geom
     double desired_angle = std::atan2(VfY, VfX);
 
     // Set cmd_vel
-    // double normVf = std::sqrt(VfX * VfX + VfY * VfY);
-    // cmd_vel.linear.x = std::min(V_MAX_DES, normVf);
     cmd_vel.linear.x = V_MAX_DES;
 
     // Calculate difference in orientation
@@ -345,7 +343,8 @@ int main(int argc, char **argv) {
 
     // Dynamically construct topic names using ID_ROBOT
     std::stringstream ss;
-    ss << "robot_" << ROBOT_ROL == 0? ID_ROBOT : ID_LEADER;
+    ss << "robot_" << (ROBOT_ROL == 0 ? ID_ROBOT : ID_LEADER);
+    ROS_INFO("robot_leader: %s", robot_leader.c_str());
     std::string robot_leader = ss.str(); // Example: "robot_1" for ID_ROBOT=1
     // Get the goal objective of the robot
     ros::Subscriber goal_sub = nh.subscribe("myGoals", 10, callbackmyGoal);
