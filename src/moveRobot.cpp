@@ -123,7 +123,6 @@ geometry_msgs::Twist algo1(const sensor_msgs::LaserScan& most_intense,const geom
                 ROS_INFO("AVOID OBSTACLES DEACTIVATED");
             }
         }
-        last_decision_time=current_time;
         cmd_vel.linear.x = V_MAX_DES;
         return cmd_vel;
     }
