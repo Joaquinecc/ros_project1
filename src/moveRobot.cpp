@@ -56,20 +56,20 @@ ros::Time start;
 
 geometry_msgs::Point goal_coord; // Global goal position
 geometry_msgs::Point leader_coords; // Global goal position
-double current_orientationr;     // Current orientation in radians
+double leader_orientationr;     // Current orientation in radians
 
 // State Flags
 bool DEBUG = true;               // Debug mode flag
 bool isTheregoal=false;
 
 
-double calculateOrientationDifference(const geometry_msgs::Point goal,geometry_msgs::Point robot_coords ) {
+double calculateOrientationDifference(const geometry_msgs::Point goal,const geometry_msgs::Point robot_coords,const double robot_orientationr ) {
 
     // Calculate the desired angle to the goal point
     double desired_orientation = atan2(goal.y - robot_coords.y, goal.x - robot_coords.x);
 
     // Calculate the difference in orientation
-    double orientation_difference = desired_orientation - current_orientationr;
+    double orientation_difference = desired_orientation - robot_orientationr;
 
     // Normalize the orientation difference to the range [-π, π]
     while (orientation_difference > M_PI) {
@@ -82,7 +82,7 @@ double calculateOrientationDifference(const geometry_msgs::Point goal,geometry_m
     return orientation_difference;
 }
 
-geometry_msgs::Twist algo1(const sensor_msgs::LaserScan& most_intense) {
+geometry_msgs::Twist algo1(const sensor_msgs::LaserScan& most_intense,const geometry_msgs::Point robot_coords, const double robot_orientationr,const geometry_msgs::Point goal_coord) {
 
     static bool avoid_obstacle = false; // Local flag to detect obstacles
     static ros::Time last_decision_time = ros::Time::now(); // Track last decision time
@@ -132,7 +132,7 @@ geometry_msgs::Twist algo1(const sensor_msgs::LaserScan& most_intense) {
     }
 
     // Normal operation: move toward goal
-    double diff_angle =  calculateOrientationDifference(goal_coord,leader_coords);
+    double diff_angle =  calculateOrientationDifference(goal_coord,robot_coords,robot_orientationr);
     // Proportional Controller for rotation
     double rot_vel = 0.0;
     if (fabs(diff_angle) < ORI_ERROR) {
@@ -146,7 +146,7 @@ geometry_msgs::Twist algo1(const sensor_msgs::LaserScan& most_intense) {
 
 }
 
-geometry_msgs::Twist algo2(const sensor_msgs::LaserScan& most_intense) {
+geometry_msgs::Twist algo2(const sensor_msgs::LaserScan& most_intense,const geometry_msgs::Point robot_coords, const double robot_orientationr,const geometry_msgs::Point goal_coord) {
     // Set all velocities to 0
     geometry_msgs::Twist cmd_vel;
     cmd_vel.linear.x = 0.0;
@@ -157,8 +157,8 @@ geometry_msgs::Twist algo2(const sensor_msgs::LaserScan& most_intense) {
     cmd_vel.angular.z = 0.0;
 
 	// Calculate Vobj (Go to Goal Behavior)
-	double VobjX = goal_coord.x - leader_coords.x;
-	double VobjY = goal_coord.y - leader_coords.y;
+	double VobjX = goal_coord.x - robot_coords.x;
+	double VobjY = goal_coord.y - robot_coords.y;
 	double normVobj = std::sqrt(VobjX * VobjX + VobjY * VobjY);
 	VobjX /= normVobj; // Normalize to unit vector
     VobjY /= normVobj;
@@ -181,13 +181,13 @@ geometry_msgs::Twist algo2(const sensor_msgs::LaserScan& most_intense) {
         double obsY_local = di * sin(angle);
 
         // Transform to global coordinates
-        double obsX_global = obsX_local * cos(current_orientationr) - obsY_local * sin(current_orientationr) + leader_coords.x;
-        double obsY_global = obsX_local * sin(current_orientationr) + obsY_local * cos(current_orientationr) + leader_coords.y;
+        double obsX_global = obsX_local * cos(robot_orientationr) - obsY_local * sin(robot_orientationr) + robot_coords.x;
+        double obsY_global = obsX_local * sin(robot_orientationr) + obsY_local * cos(robot_orientationr) + robot_coords.y;
 
 
         // Compute repulsion vector (global frame)
-        double repX = leader_coords.x - obsX_global;
-        double repY = leader_coords.y - obsY_global;
+        double repX = robot_coords.x - obsX_global;
+        double repY = robot_coords.y - obsY_global;
 
         // Compute magnitude of repulsion
         double normRep = std::sqrt(repX * repX + repY * repY);
@@ -216,7 +216,7 @@ geometry_msgs::Twist algo2(const sensor_msgs::LaserScan& most_intense) {
     cmd_vel.linear.x = V_MAX_DES;
 
     // Calculate difference in orientation
-    double diff_angle = desired_angle - current_orientationr;
+    double diff_angle = desired_angle - robot_orientationr;
 
     // Normalize diff_angle to the range [-pi, pi]
     while (diff_angle > M_PI) diff_angle -= 2 * M_PI;
@@ -241,14 +241,14 @@ void callbackLaserLeader(const sensor_msgs::LaserScan& most_intense) {
     if (isTheregoal) { // If there is a goal, we move toward it
 
         if (ALGOR == 1) {
-                cmd_vel = algo1(most_intense);
+                cmd_vel = algo1(most_intense,leader_coords,leader_orientationr,goal_coord);
                 cmd_vel_pub.publish(cmd_vel);
         }else if (ALGOR == 2) { // Potential fields algorithm
              ros::Time current_time = ros::Time::now();
 			// Check if enough time has passed for algo2 decisions
             if ((current_time - last_decision_time).toSec() * 1000 >= T_WAIT) {
                 // Execute algo2 for potential fields algorithm
-                cmd_vel = algo2(most_intense);
+                cmd_vel = algo2(most_intense,leader_coords,leader_orientationr,goal_coord);
                 // Update the last decision time
                 last_decision_time = current_time;
                 //Update velocities
@@ -261,12 +261,13 @@ void callbackLaserLeader(const sensor_msgs::LaserScan& most_intense) {
 }
 
 
+
 void callbackOdomLeader(const nav_msgs::Odometry odom) {
 	leader_coords.x = odom.pose.pose.position.x;
 	leader_coords.y = odom.pose.pose.position.y;
 	double current_z=odom.pose.pose.orientation.z;
 	double current_w=odom.pose.pose.orientation.w;
-	current_orientationr=(2.0*atan2(current_z,current_w));
+	leader_orientationr=(2.0*atan2(current_z,current_w));
 
 	if (isTheregoal) {
 		double distance_to_goal = sqrt(pow(goal_coord.x - leader_coords.x, 2) + pow(goal_coord.y - leader_coords.y, 2));
@@ -340,23 +341,20 @@ int main(int argc, char **argv) {
     ROS_INFO("W_2: %.2f", W_2);
     ROS_INFO("T_WAIT: %d", T_WAIT);
 
+
+
     // Dynamically construct topic names using ID_ROBOT
     std::stringstream ss;
-    ss << "robot_" << ID_ROBOT;
-
-    std::string robot_ns = ss.str(); // Example: "robot_1" for ID_ROBOT=1
-
+    ss << "robot_" << ROBOT_ROL == 0? ID_ROBOT : ID_LEADER;
+    std::string robot_leader = ss.str(); // Example: "robot_1" for ID_ROBOT=1
     // Get the goal objective of the robot
     ros::Subscriber goal_sub = nh.subscribe("myGoals", 10, callbackmyGoal);
-
     // Publisher for robot velocity
-    cmd_vel_pub = nh.advertise<geometry_msgs::Twist>(robot_ns + "/cmd_vel", 10);
-
+    cmd_vel_pub = nh.advertise<geometry_msgs::Twist>(robot_leader + "/cmd_vel", 10);
     // Subscriber for robot's odometry
-    ros::Subscriber odom_sub = nh.subscribe(robot_ns + "/odom", 10, callbackOdomLeader);
-
+    ros::Subscriber odom_sub = nh.subscribe(robot_leader + "/odom", 10, callbackOdomLeader);
     // Subscriber for robot's laser scan
-    ros::Subscriber laser_sub = nh.subscribe(robot_ns + "/base_scan_1", 1, callbackLaserLeader);
+    ros::Subscriber laser_sub = nh.subscribe(robot_leader + "/base_scan_1", 1, callbackLaserLeader);
 
 	start = ros::Time::now();
 	ros::spin();
