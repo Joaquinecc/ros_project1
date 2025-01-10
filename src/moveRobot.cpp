@@ -1,7 +1,12 @@
 /**
- *  Created on: January 2025
- *  Author: Joaquin Caballero
- *  Example of odometry, laser and command vel topics
+ *  @file moveRobot.cpp
+ *  @brief Example of ROS node using odometry, laser, and velocity command topics for robot navigation.
+ *
+ *  This program demonstrates basic robot navigation using sensor data and control algorithms.
+ *  It supports two algorithms: obstacle avoidance and potential fields.
+ *
+ *  @created January 2025
+ *  @author Joaquin Caballero
  */
 
 #include "ros/ros.h"
@@ -48,24 +53,32 @@ double W_1 = 1.5;               // Weight for goal attraction
 double W_2 = 3.0;               // Weight for obstacle repulsion
 int T_WAIT = 150;               // Time to wait between algorithm decisions (ms)
 
-/**
- * ROS Publisher and Global Variables
- */
-ros::Publisher cmd_leader_vel_pub;      // Publisher for movement commands
-ros::Publisher cmd_follower_vel_pub;      // Publisher for movement commands
+// ROS Publishers
+ros::Publisher cmd_leader_vel_pub;  ///< Publisher for leader movement commands
+ros::Publisher cmd_follower_vel_pub; ///< Publisher for follower movement commands
+
 ros::Time start;
 
-geometry_msgs::Point goal_coord; // Global goal position
-geometry_msgs::Point leader_coord; // Global goal position
-double leader_orientationr;     // Current orientation in radians
-geometry_msgs::Point follower_coord; // Global goal position
-double follower_orientationr;     // Current orientation in radians
-
-// State Flags
-bool DEBUG = false;               // Debug mode flag
-bool isTheregoal=false;
+// Goal and robot state variables
+geometry_msgs::Point goal_coord; ///< Global goal position
+geometry_msgs::Point leader_coord; ///< Current position of the leader robot
+geometry_msgs::Point follower_coord; ///< Current position of the follower robot
+double leader_orientationr;     ///< Leader's current orientation (radians)
+double follower_orientationr;   ///< Follower's current orientation (radians)
 
 
+// Flags
+bool DEBUG = false;               ///< Debug mode flag
+bool isTheregoal = false;         ///< Flag to indicate if a goal exists
+
+/**
+ * @brief Calculate the orientation difference between the robot and the goal.
+ *
+ * @param goal Target goal position
+ * @param robot_coords Current robot position
+ * @param robot_orientationr Current robot orientation (radians)
+ * @return Normalized orientation difference (radians)
+ */
 double calculateOrientationDifference(const geometry_msgs::Point goal,const geometry_msgs::Point robot_coords,const double robot_orientationr ) {
 
     // Calculate the desired angle to the goal point
@@ -84,7 +97,15 @@ double calculateOrientationDifference(const geometry_msgs::Point goal,const geom
 
     return orientation_difference;
 }
-
+/**
+ * @brief Simple obstacle avoidance algorithm (Algorithm 1).
+ *
+ * @param most_intense Laser scan data
+ * @param robot_coords Current robot position
+ * @param robot_orientationr Current robot orientation (radians)
+ * @param goal_coord Target goal position
+ * @return Calculated velocity commands for the robot
+ */
 geometry_msgs::Twist algo1(const sensor_msgs::LaserScan& most_intense,const geometry_msgs::Point robot_coords, const double robot_orientationr,const geometry_msgs::Point goal_coord) {
 
     static bool avoid_obstacle = false; // Local flag to detect obstacles
@@ -147,7 +168,15 @@ geometry_msgs::Twist algo1(const sensor_msgs::LaserScan& most_intense,const geom
     return cmd_vel;
 
 }
-
+/**
+ * @brief Potential fields algorithm (Algorithm 2).
+ *
+ * @param most_intense Laser scan data
+ * @param robot_coords Current robot position
+ * @param robot_orientationr Current robot orientation (radians)
+ * @param goal_coord Target goal position
+ * @return Calculated velocity commands for the robot
+ */
 geometry_msgs::Twist algo2(const sensor_msgs::LaserScan& most_intense,const geometry_msgs::Point robot_coords, const double robot_orientationr,const geometry_msgs::Point goal_coord) {
     // Set all velocities to 0
     geometry_msgs::Twist cmd_vel;
@@ -234,7 +263,13 @@ geometry_msgs::Twist algo2(const sensor_msgs::LaserScan& most_intense,const geom
 
     return cmd_vel;
 }
-
+/**
+ * @brief Callback function for leader's LaserScan data.
+ *
+ * Processes laser scan data for the leader robot and generates velocity commands based on the selected algorithm.
+ *
+ * @param most_intense Laser scan message containing obstacle data.
+ */
 void callbackLaserLeader(const sensor_msgs::LaserScan& most_intense) {
     static ros::Time last_decision_time = ros::Time::now(); // Track last decision time
     geometry_msgs::Twist cmd_vel; // Initialize cmd_vel
@@ -259,7 +294,14 @@ void callbackLaserLeader(const sensor_msgs::LaserScan& most_intense) {
 
     }
 }
-
+/**
+ * @brief Callback function for follower's LaserScan data.
+ *
+ * Processes laser scan data for the follower robot and generates velocity commands
+ * based on the selected algorithm and distance to the leader.
+ *
+ * @param most_intense Laser scan message containing obstacle data.
+ */
 void callbackLaserFollower(const sensor_msgs::LaserScan& most_intense) {
     if (ROBOT_ROL == 0 || !isTheregoal) return;
     static ros::Time last_decision_time = ros::Time::now(); // Track last decision time
@@ -304,7 +346,13 @@ void callbackLaserFollower(const sensor_msgs::LaserScan& most_intense) {
 
 }
 
-
+/**
+ * @brief Callback function for leader's odometry data.
+ *
+ * Updates the leader robot's current position and orientation, and checks if the goal has been reached.
+ *
+ * @param odom Odometry message containing the leader's position and orientation.
+ */
 void callbackOdomLeader(const nav_msgs::Odometry odom) {
 	leader_coord.x = odom.pose.pose.position.x;
 	leader_coord.y = odom.pose.pose.position.y;
@@ -320,6 +368,13 @@ void callbackOdomLeader(const nav_msgs::Odometry odom) {
 		}
 	}
 }
+/**
+ * @brief Callback function for follower's odometry data.
+ *
+ * Updates the follower robot's current position and orientation.
+ *
+ * @param odom Odometry message containing the follower's position and orientation.
+ */
 void callbackOdomFollower(const nav_msgs::Odometry odom) {
     if (ROBOT_ROL == 0 || !isTheregoal) return;
 	follower_coord.x = odom.pose.pose.position.x;
