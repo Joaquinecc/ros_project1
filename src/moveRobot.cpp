@@ -62,7 +62,7 @@ geometry_msgs::Point follower_coord; // Global goal position
 double follower_orientationr;     // Current orientation in radians
 
 // State Flags
-bool DEBUG = true;               // Debug mode flag
+bool DEBUG = false;               // Debug mode flag
 bool isTheregoal=false;
 
 
@@ -261,7 +261,7 @@ void callbackLaserLeader(const sensor_msgs::LaserScan& most_intense) {
 }
 
 void callbackLaserFollower(const sensor_msgs::LaserScan& most_intense) {
-    if (ROBOT_ROL == 0 && !isTheregoal) return;
+    if (ROBOT_ROL == 0 || !isTheregoal) return;
     static ros::Time last_decision_time = ros::Time::now(); // Track last decision time
     geometry_msgs::Twist cmd_vel; // Initialize cmd_vel
     double distance_to_leader = sqrt(pow(leader_coord.x - follower_coord.x, 2) + pow(leader_coord.y - follower_coord.y, 2));
@@ -321,7 +321,7 @@ void callbackOdomLeader(const nav_msgs::Odometry odom) {
 	}
 }
 void callbackOdomFollower(const nav_msgs::Odometry odom) {
-    if (ROBOT_ROL == 0 && !isTheregoal) return;
+    if (ROBOT_ROL == 0 || !isTheregoal) return;
 	follower_coord.x = odom.pose.pose.position.x;
 	follower_coord.y = odom.pose.pose.position.y;
 	double current_z=odom.pose.pose.orientation.z;
